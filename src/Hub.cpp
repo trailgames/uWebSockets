@@ -42,7 +42,7 @@ char *Hub::inflate(char *data, size_t &length) {
     return inflationBuffer;
 }
 
-void Hub::onServerAccept(uS::Socket *s) {
+uS::Socket *Hub::onServerAccept(uS::Socket *s) {
     HttpSocket<SERVER> *httpSocket = new HttpSocket<SERVER>(s);
     delete s;
 
@@ -51,6 +51,8 @@ void Hub::onServerAccept(uS::Socket *s) {
     httpSocket->setNoDelay(true);
     Group<SERVER>::from(httpSocket)->addHttpSocket(httpSocket);
     Group<SERVER>::from(httpSocket)->httpConnectionHandler(httpSocket);
+
+    return httpSocket;
 }
 
 void Hub::onClientConnection(uS::Socket *s, bool error) {
@@ -68,6 +70,7 @@ void Hub::onClientConnection(uS::Socket *s, bool error) {
 }
 
 bool Hub::listen(const char *host, int port, uS::TLS::Context sslContext, int options, Group<SERVER> *eh) {
+#ifndef USE_MICRO_TCP
     if (!eh) {
         eh = (Group<SERVER> *) this;
     }
@@ -77,6 +80,7 @@ bool Hub::listen(const char *host, int port, uS::TLS::Context sslContext, int op
         return false;
     }
     return true;
+#endif
 }
 
 bool Hub::listen(int port, uS::TLS::Context sslContext, int options, Group<SERVER> *eh) {
@@ -155,6 +159,7 @@ void Hub::connect(std::string uri, void *user, std::map<std::string, std::string
 }
 
 void Hub::upgrade(uv_os_sock_t fd, const char *secKey, SSL *ssl, const char *extensions, size_t extensionsLength, const char *subprotocol, size_t subprotocolLength, Group<SERVER> *serverGroup) {
+#ifndef USE_MICRO_TCP
     if (!serverGroup) {
         serverGroup = &getDefaultGroup<SERVER>();
     }
@@ -175,6 +180,7 @@ void Hub::upgrade(uv_os_sock_t fd, const char *secKey, SSL *ssl, const char *ext
     webSocket->change(webSocket->nodeData->loop, webSocket, webSocket->setPoll(UV_READABLE));
     serverGroup->addWebSocket(webSocket);
     serverGroup->connectionHandler(webSocket, {});
+#endif
 }
 
 }

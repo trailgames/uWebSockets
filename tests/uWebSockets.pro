@@ -12,7 +12,8 @@ SOURCES += main.cpp \
     ../src/Socket.cpp \
     ../src/Group.cpp \
     ../src/Extensions.cpp \
-    ../src/Epoll.cpp
+    ../src/Epoll.cpp \
+    ../src/Tcp.cpp
 
 HEADERS += ../src/WebSocketProtocol.h \
     ../src/Networking.h \
@@ -27,11 +28,13 @@ HEADERS += ../src/WebSocketProtocol.h \
     ../src/Libuv.h \
     ../src/Backend.h \
     ../src/Epoll.h \
-    ../src/Asio.h
+    ../src/Asio.h \
+    ../src/IP.h \
+    ../src/Tcp.h
 
 LIBS += -lasan -lssl -lcrypto -lz -lpthread -luv -lboost_system
 
-QMAKE_CXXFLAGS += -DUWS_THREADSAFE -fsanitize=address -Wno-unused-parameter
+QMAKE_CXXFLAGS += -DUSE_MICRO_TCP -DUWS_THREADSAFE -fsanitize=address -Wno-unused-parameter
 QMAKE_CXXFLAGS_RELEASE -= -O1
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE *= -O3 -g

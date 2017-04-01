@@ -220,6 +220,7 @@ void WebSocket<isServer>::terminate() {
  */
 template <bool isServer>
 void WebSocket<isServer>::transfer(Group<isServer> *group) {
+#ifndef USE_MICRO_TCP
     Group<isServer>::from(this)->removeWebSocket(this);
     if (group->loop == Group<isServer>::from(this)->loop) {
         // fast path
@@ -234,6 +235,7 @@ void WebSocket<isServer>::transfer(Group<isServer> *group) {
             Group<isServer>::from(webSocket)->transferHandler(webSocket);
         });
     }
+#endif
 }
 
 /*
@@ -289,7 +291,7 @@ void WebSocket<isServer>::onEnd(uS::Socket *s) {
         webSocket->messageQueue.pop();
     }
 
-    webSocket->nodeData->clearPendingPollChanges(webSocket);
+    //webSocket->nodeData->clearPendingPollChanges(webSocket);
 }
 
 template <bool isServer>

@@ -1142,11 +1142,71 @@ void testThreadSafety() {
     }
 }
 
+#include "Tcp.h"
+
+uS::Socket *staticSocket;
+char *staticData;
+size_t staticLength;
+
+bool uS::Socket::write(Queue::Message *messagePtr, bool &wasTransferred) {
+
+    ::Socket *internalSocket = (::Socket *) socket;
+
+    internalSocket->send((char *) messagePtr->data, messagePtr->length);
+
+    wasTransferred = false;
+    return true;
+}
+
+void serveCustom() {
+    IP ip;
+    Tcp t(ip, 4000);
+
+    std::cout << "PID: " << getpid() << std::endl;
+
+    uWS::Hub h;
+
+    std::string document = "Some http";
+
+    h.onHttpRequest([&document](uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
+        res->end(document.data(), document.length());
+    });
+
+    h.onConnection([](uWS::WebSocket<uWS::SERVER> *ws, uWS::HttpRequest req) {
+
+    });
+
+    h.onMessage([](uWS::WebSocket<uWS::SERVER> *ws, char *message, size_t length, uWS::OpCode opCode) {
+        ws->send(message, length, opCode);
+    });
+
+    t.onConnection([&h](Socket *socket) {
+        uS::Socket *uSocket = new uS::Socket((uS::NodeData *) &h.getDefaultGroup<uWS::SERVER>(), socket);
+        socket->userData = h.onServerAccept(uSocket);
+    });
+
+    t.onDisconnection([](Socket *) {
+
+    });
+
+    t.onData([](Socket *socket, char *data, size_t length) {
+        uS::Socket *uSocket = (uS::Socket *) socket->userData;
+        staticData = data;
+        staticLength = length;
+        uSocket->cb((Poll *) uSocket, 0, 1);
+        socket->userData = staticSocket;
+    });
+
+    t.run();
+}
+
 int main(int argc, char *argv[])
 {
     //serveEventSource();
     //serveHttp();
     //serveBenchmark();
+
+    serveCustom();
 
 #ifdef UWS_THREADSAFE
     testThreadSafety();

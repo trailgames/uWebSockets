@@ -5,6 +5,7 @@ namespace uS {
 // this should be Node
 void NodeData::asyncCallback(Async *async)
 {
+#ifndef USE_MICRO_TCP
     NodeData *nodeData = (NodeData *) async->getData();
 
     nodeData->asyncMutex->lock();
@@ -32,6 +33,7 @@ void NodeData::asyncCallback(Async *async)
     nodeData->changePollQueue.clear();
     nodeData->transferQueue.clear();
     nodeData->asyncMutex->unlock();
+#endif
 }
 
 Node::Node(int recvLength, int prePadding, int postPadding, bool useDefaultLoop) {

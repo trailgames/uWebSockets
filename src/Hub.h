@@ -11,7 +11,7 @@
 namespace uWS {
 
 struct WIN32_EXPORT Hub : private uS::Node, public Group<SERVER>, public Group<CLIENT> {
-protected:
+public:
     struct ConnectionData {
         std::string path;
         void *user;
@@ -24,7 +24,7 @@ protected:
     std::string dynamicInflationBuffer;
     static const int LARGE_BUFFER_SIZE = 300 * 1024;
 
-    static void onServerAccept(uS::Socket *s);
+    static uS::Socket *onServerAccept(uS::Socket *s);
     static void onClientConnection(uS::Socket *s, bool error);
 
 public:

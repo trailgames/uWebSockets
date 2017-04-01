@@ -43,7 +43,7 @@ protected:
     int extensionOptions;
     Timer *timer = nullptr, *httpTimer = nullptr;
     std::string userPingMessage;
-    std::stack<Poll *> iterators;
+    std::stack<uS::Socket *> iterators;
 
     // todo: cannot be named user, collides with parent!
     void *userData = nullptr;
@@ -102,10 +102,10 @@ public:
 
     template <class F>
     void forEach(const F &cb) {
-        Poll *iterator = webSocketHead;
+        uS::Socket *iterator = webSocketHead;
         iterators.push(iterator);
         while (iterator) {
-            Poll *lastIterator = iterator;
+            uS::Socket *lastIterator = iterator;
             cb((WebSocket<isServer> *) iterator);
             iterator = iterators.top();
             if (lastIterator == iterator) {
@@ -119,10 +119,10 @@ public:
     // duplicated code for now!
     template <class F>
     void forEachHttpSocket(const F &cb) {
-        Poll *iterator = httpSocketHead;
+        uS::Socket *iterator = httpSocketHead;
         iterators.push(iterator);
         while (iterator) {
-            Poll *lastIterator = iterator;
+            uS::Socket *lastIterator = iterator;
             cb((HttpSocket<isServer> *) iterator);
             iterator = iterators.top();
             if (lastIterator == iterator) {

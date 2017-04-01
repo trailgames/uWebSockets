@@ -3,6 +3,12 @@
 
 #include "Networking.h"
 
+#include <iostream>
+
+extern uS::Socket *staticSocket;
+extern char *staticData;
+extern size_t staticLength;
+
 namespace uS {
 
 struct TransferData {
@@ -21,6 +27,237 @@ struct TransferData {
     NodeData *destination;
     void (*transferCb)(Poll *);
 };
+
+#ifdef USE_MICRO_TCP
+
+struct Socket {
+    SSL *ssl = nullptr;
+    void *user = nullptr;
+    NodeData *nodeData;
+
+    void *socket;
+
+    Socket(NodeData *nodeData, void *socket) {
+        this->socket = socket;
+        this->nodeData = nodeData;
+    }
+
+    struct Queue {
+        struct Message {
+            const char *data;
+            size_t length;
+            Message *nextMessage = nullptr;
+            void (*callback)(void *socket, void *data, bool cancelled, void *reserved) = nullptr;
+            void *callbackData = nullptr, *reserved = nullptr;
+        };
+
+        Message *head = nullptr, *tail = nullptr;
+        void pop()
+        {
+            Message *nextMessage;
+            if ((nextMessage = head->nextMessage)) {
+                delete [] (char *) head;
+                head = nextMessage;
+            } else {
+                delete [] (char *) head;
+                head = tail = nullptr;
+            }
+        }
+
+        bool empty() {return head == nullptr;}
+        Message *front() {return head;}
+
+        void push(Message *message)
+        {
+            message->nextMessage = nullptr;
+            if (tail) {
+                tail->nextMessage = message;
+                tail = message;
+            } else {
+                head = message;
+                tail = message;
+            }
+        }
+    } messageQueue;
+
+    NodeData *getNodeData() {
+        return nodeData;
+    }
+
+    int setPoll(int events) {
+
+    }
+
+    int getFd() {
+
+    }
+
+    void start(Loop *loop, Socket *self, int events) {
+
+    }
+
+    void change(Loop *loop, Socket *self, int events) {
+
+    }
+
+    void stop(Loop *loop) {
+
+    }
+
+    bool isClosed() {
+        return false;
+    }
+
+    void setShuttingDown(bool enabled) {
+
+    }
+
+    void (*cb)(Poll *p, int status, int events) = nullptr;
+
+    void setCb(void (*cb)(Poll *p, int status, int events)) {
+        this->cb = cb;
+    }
+
+    template <class T>
+    void closeSocket() {
+
+    }
+
+    bool isShuttingDown() {
+        return false;
+    }
+
+    void shutdown() {
+
+    }
+
+    Socket *next = nullptr, *prev = nullptr;
+
+    Queue::Message *allocMessage(size_t length, const char *data = 0) {
+        Queue::Message *messagePtr = (Queue::Message *) new char[sizeof(Queue::Message) + length];
+        messagePtr->length = length;
+        messagePtr->data = ((char *) messagePtr) + sizeof(Queue::Message);
+        messagePtr->nextMessage = nullptr;
+
+        if (data) {
+            memcpy((char *) messagePtr->data, data, messagePtr->length);
+        }
+
+        return messagePtr;
+    }
+
+    void freeMessage(Queue::Message *message) {
+        delete [] (char *) message;
+    }
+
+    bool hasEmptyQueue() {
+        return true;
+    }
+
+    bool write(Queue::Message *messagePtr, bool &wasTransferred);
+
+    void *getUserData() {
+        return user;
+    }
+
+    void setUserData(void *userData) {
+        this->user = userData;
+    }
+
+    void setNoDelay(bool enabled) {
+
+    }
+
+    // clears user data!
+    template <void onTimeout(Socket *)>
+    void startTimeout(int timeoutMs = 15000) {
+        Timer *timer = new Timer(nodeData->loop);
+        timer->setData(this);
+        timer->start([](Timer *timer) {
+            Socket *s = (Socket *) timer->getData();
+            s->cancelTimeout();
+            onTimeout(s);
+        }, timeoutMs, 0);
+
+        user = timer;
+    }
+
+    void cancelTimeout() {
+        Timer *timer = (Timer *) getUserData();
+        if (timer) {
+            timer->stop();
+            timer->close();
+            user = nullptr;
+        }
+    }
+
+    void reInit(Loop *loop, uv_os_sock_t fd) {
+
+    }
+
+    int getPoll() {
+
+    }
+
+    operator Poll *() const {
+        return (Poll *) this;
+    }
+
+    template <class STATE>
+    static void ioHandler(Poll *p, int status, int events) {
+        staticSocket = STATE::onData((uS::Socket *) p, staticData, staticLength);
+    }
+
+    template<class STATE>
+    void setState() {
+        if (ssl) {
+            //setCb(sslIoHandler<STATE>);
+        } else {
+            setCb(ioHandler<STATE>);
+        }
+    }
+
+    void cork(bool enabled) {
+
+    }
+
+    template <class T, class D>
+    void sendTransformed(const char *message, size_t length, void(*callback)(void *socket, void *data, bool cancelled, void *reserved), void *callbackData, D transformData) {
+        size_t estimatedLength = T::estimate(message, length) + sizeof(Queue::Message);
+
+        if (estimatedLength <= uS::NodeData::preAllocMaxSize) {
+            int memoryLength = estimatedLength;
+            int memoryIndex = nodeData->getMemoryBlockIndex(memoryLength);
+
+            Queue::Message *messagePtr = (Queue::Message *) nodeData->getSmallMemoryBlock(memoryIndex);
+            messagePtr->data = ((char *) messagePtr) + sizeof(Queue::Message);
+            messagePtr->length = T::transform(message, (char *) messagePtr->data, length, transformData);
+
+            bool wasTransferred;
+            if (write(messagePtr, wasTransferred)) {
+                if (!wasTransferred) {
+                    nodeData->freeSmallMemoryBlock((char *) messagePtr, memoryIndex);
+                    if (callback) {
+                        callback(this, callbackData, false, nullptr);
+                    }
+                } else {
+                    messagePtr->callback = callback;
+                    messagePtr->callbackData = callbackData;
+                }
+            } else {
+                nodeData->freeSmallMemoryBlock((char *) messagePtr, memoryIndex);
+                if (callback) {
+                    callback(this, callbackData, true, nullptr);
+                }
+            }
+        } else {
+            std::cout << "Too long message!" << std::endl;
+        }
+    }
+
+};
+
+#else
 
 // perfectly 64 bytes (4 + 60)
 struct WIN32_EXPORT Socket : Poll {
@@ -492,11 +729,15 @@ public:
     friend struct NodeData;
 };
 
+#endif
+
 struct ListenSocket : Socket {
 
+#ifndef USE_MICRO_TCP
     ListenSocket(NodeData *nodeData, Loop *loop, uv_os_sock_t fd, SSL *ssl) : Socket(nodeData, loop, fd, ssl) {
 
     }
+#endif
 
     Timer *timer = nullptr;
     uS::TLS::Context sslContext;

@@ -2,7 +2,7 @@
 
 namespace uS {
 
-Socket::Address Socket::getAddress()
+/*Socket::Address Socket::getAddress()
 {
     uv_os_sock_t fd = getFd();
 
@@ -23,6 +23,6 @@ Socket::Address Socket::getAddress()
         inet_ntop(AF_INET6, &ipv6->sin6_addr, buf, sizeof(buf));
         return {ntohs(ipv6->sin6_port), buf, "IPv6"};
     }
-}
+}*/
 
 }

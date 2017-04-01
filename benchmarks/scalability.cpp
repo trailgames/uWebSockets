@@ -96,19 +96,15 @@ bool nextConnection(int tid)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3) {
-        cout << "Usage: scalability numberOfConnections port" << endl;
+    if (argc != 4) {
+        cout << "Usage: scalability numberOfConnections port serverPid" << endl;
         return -1;
     }
 
     totalConnections = atoi(argv[1]);
     port = atoi(argv[2]);
 
-    FILE *pipe = popen(("fuser " + to_string(port) + "/tcp 2> /dev/null").c_str(), "r");
-    char line[10240] = {};
-    fgets(line, sizeof(line), pipe);
-    pclose(pipe);
-    int pid = atoi(line);
+    int pid = atoi(argv[3]);
 
     auto startPoint = high_resolution_clock::now();
     vector<thread *> threads;

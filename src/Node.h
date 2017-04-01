@@ -33,6 +33,7 @@ private:
 
     template <void A(Socket *s), bool TIMER>
     static void accept_cb(ListenSocket *listenSocket) {
+#ifndef USE_MICRO_TCP
         uv_os_sock_t serverFd = listenSocket->getFd();
         Context *netContext = listenSocket->nodeData->netContext;
         uv_os_sock_t clientFd = netContext->acceptSocket(serverFd);
@@ -69,6 +70,7 @@ private:
             socket->setPoll(UV_READABLE);
             A(socket);
         } while ((clientFd = netContext->acceptSocket(serverFd)) != INVALID_SOCKET);
+#endif
     }
 
 protected:
@@ -87,6 +89,7 @@ public:
 
     template <uS::Socket *I(Socket *s), void C(Socket *p, bool error)>
     Socket *connect(const char *hostname, int port, bool secure, NodeData *nodeData) {
+#ifndef USE_MICRO_TCP
         Context *netContext = nodeData->netContext;
 
         addrinfo hints, *result;
@@ -118,11 +121,13 @@ public:
         socket->setCb(connect_cb<C>);
         socket->start(loop, socket, socket->setPoll(UV_WRITABLE));
         return socket;
+#endif
     }
 
     // todo: hostname, backlog
     template <void A(Socket *s)>
     bool listen(const char *host, int port, uS::TLS::Context sslContext, int options, uS::NodeData *nodeData, void *user) {
+#ifndef USE_MICRO_TCP
         addrinfo hints, *result;
         memset(&hints, 0, sizeof(addrinfo));
 
@@ -189,6 +194,7 @@ public:
 
         freeaddrinfo(result);
         return false;
+#endif
     }
 };
 
