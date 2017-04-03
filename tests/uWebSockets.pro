@@ -32,9 +32,9 @@ HEADERS += ../src/WebSocketProtocol.h \
     ../src/IP.h \
     ../src/Tcp.h
 
-LIBS += -lasan -lssl -lcrypto -lz -lpthread -luv -lboost_system
+LIBS += -lssl -lcrypto -lz -lpthread -luv -lboost_system
 
-QMAKE_CXXFLAGS += -DUSE_MICRO_TCP -DUWS_THREADSAFE -fsanitize=address -Wno-unused-parameter
+QMAKE_CXXFLAGS += -DUSE_MICRO_TCP -DUWS_THREADSAFE -Wno-unused-parameter
 QMAKE_CXXFLAGS_RELEASE -= -O1
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE *= -O3 -g

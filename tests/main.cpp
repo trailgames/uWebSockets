@@ -1160,7 +1160,7 @@ bool uS::Socket::write(Queue::Message *messagePtr, bool &wasTransferred) {
 
 void serveCustom() {
     IP ip;
-    Tcp t(ip, 4000);
+    Tcp t(&ip, 4000);
 
     std::cout << "PID: " << getpid() << std::endl;
 

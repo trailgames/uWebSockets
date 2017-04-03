@@ -7,6 +7,7 @@
 #include <vector>
 #include <functional>
 #include <set>
+#include <map>
 
 struct TcpHeader : tcphdr {
 
@@ -20,33 +21,35 @@ struct TcpHeader : tcphdr {
 
 };
 
-extern IP globalIP;
+extern IP *globalIP;
 
 struct Socket {
 
-    /*static unsigned short csum(unsigned short *ptr,int nbytes)
-    {
-        register long sum;
-        unsigned short oddbyte;
-        register short answer;
+//    static unsigned short csum(char *p,int nbytes)
+//    {
+//        unsigned short *ptr = (unsigned short *) p;
 
-        sum=0;
-        while(nbytes>1) {
-            sum+=*ptr++;
-            nbytes-=2;
-        }
-        if(nbytes==1) {
-            oddbyte=0;
-            *((u_char*)&oddbyte)=*(u_char*)ptr;
-            sum+=oddbyte;
-        }
+//        register long sum;
+//        unsigned short oddbyte;
+//        register short answer;
 
-        sum = (sum>>16)+(sum & 0xffff);
-        sum = sum + (sum>>16);
-        answer=(short)~sum;
+//        sum=0;
+//        while(nbytes>1) {
+//            sum+=*ptr++;
+//            nbytes-=2;
+//        }
+//        if(nbytes==1) {
+//            oddbyte=0;
+//            *((u_char*)&oddbyte)=*(u_char*)ptr;
+//            sum+=oddbyte;
+//        }
 
-        return(answer);
-    }*/
+//        sum = (sum>>16)+(sum & 0xffff);
+//        sum = sum + (sum>>16);
+//        answer=(short)~sum;
+
+//        return(answer);
+//    }
 
     static unsigned short csum(const char *buf, unsigned size) {
             unsigned long long sum = 0;
@@ -111,13 +114,23 @@ struct Socket {
         u_int16_t tcp_length;
     };
 
+    // no need for copies?
     static unsigned short getChecksum(tcphdr *tcpHeader, pseudo_header *info, char *data = nullptr, size_t length = 0) {
+
+
+
+
         char buf[sizeof(tcphdr) + sizeof(pseudo_header) + 1024];
+
         memcpy(buf + sizeof(pseudo_header), tcpHeader, sizeof(tcphdr));
+
         memcpy(buf, info, sizeof(pseudo_header));
+
         memcpy(buf + sizeof(pseudo_header) + sizeof(tcphdr), data, length);
 
         return csum(buf, sizeof(tcphdr) + sizeof(pseudo_header) + length);
+
+
     }
 
 
@@ -134,41 +147,38 @@ struct Socket {
     static void sendPacket(uint32_t hostSeq, uint32_t hostAck, uint32_t networkDestIp, uint32_t networkSourceIp, int hostDestPort,
                            int hostSourcePort, bool flagAck, bool flagSyn, bool flagFin, bool flagRst, char *data, size_t length) {
 
-        // has to include ip header to allow sending from (source) other than 127.0.0.1
-        iphdr iph = {};
-        iph.ihl = 5;
-        iph.version = 4;
-        iph.tot_len = htons(sizeof(iphdr) + sizeof(tcphdr) + length);
-        iph.id = htonl(54321);
-        iph.ttl = 255;
-        iph.protocol = IPPROTO_TCP;
-        iph.saddr = networkSourceIp;
-        iph.daddr = networkDestIp;
-        iph.check = csum((char *) &iph, sizeof(iphdr));
+        IpHeader *ipHeader = globalIP->getIpPacketBuffer();
+        memset(ipHeader, 0, sizeof(iphdr));
 
-        // take a copy as base!
-        tcphdr newTcpHeader = {};
+        ipHeader->ihl = 5;
+        ipHeader->version = 4;
+        ipHeader->tot_len = htons(sizeof(iphdr) + sizeof(tcphdr) + length);
+        ipHeader->id = htonl(54321);
+        ipHeader->ttl = 255;
+        ipHeader->protocol = IPPROTO_TCP;
+        ipHeader->saddr = networkSourceIp;
+        ipHeader->daddr = networkDestIp;
+        ipHeader->check = csum((char *) ipHeader, sizeof(iphdr));
 
-        // these are flags
-        newTcpHeader.ack = flagAck;
-        newTcpHeader.syn = flagSyn;
-        newTcpHeader.fin = flagFin;
-        newTcpHeader.rst = flagRst;
+        TcpHeader *tcpHeader = (TcpHeader *) ipHeader->getData();
+        memset(tcpHeader, 0, sizeof(tcphdr));
 
+        tcpHeader->ack = flagAck;
+        tcpHeader->syn = flagSyn;
+        tcpHeader->fin = flagFin;
+        tcpHeader->rst = flagRst;
         if (data) {
-            newTcpHeader.psh = true;
+            tcpHeader->psh = true;
         }
 
-
-        newTcpHeader.ack_seq = htonl(hostAck);
-        newTcpHeader.seq = htonl(hostSeq);
-        newTcpHeader.source = htons(hostSourcePort);
-        newTcpHeader.dest = htons(hostDestPort);
+        tcpHeader->ack_seq = htonl(hostAck);
+        tcpHeader->seq = htonl(hostSeq);
+        tcpHeader->source = htons(hostSourcePort);
+        tcpHeader->dest = htons(hostDestPort);
 
         // todo
-        newTcpHeader.doff = 5; // 5 * 4 = 20 bytes
-        newTcpHeader.window = htons(43690); // flow control
-
+        tcpHeader->doff = 5; // 5 * 4 = 20 bytes
+        tcpHeader->window = htons(43690); // flow control
 
         // properly calculate checksum for this header
         pseudo_header info;
@@ -177,19 +187,13 @@ struct Socket {
         info.placeholder = 0;
         info.protocol = IPPROTO_TCP;
         info.tcp_length = htons(sizeof(tcphdr) + length);
-        newTcpHeader.check = getChecksum(&newTcpHeader, &info, data, length);
+        tcpHeader->check = getChecksum(tcpHeader, &info, data, length);
 
-        char buf[sizeof(iphdr) + sizeof(tcphdr) + length];
-        memcpy(buf, &iph, sizeof(iphdr));
-        memcpy(buf + sizeof(iphdr), &newTcpHeader, sizeof(tcphdr));
-        memcpy(buf + sizeof(iphdr) + sizeof(tcphdr), data, length);
-
-        // IP driver
-        globalIP.writeIpPacket((IpHeader *) buf, sizeof(iphdr) + sizeof(tcphdr) + length, hostDestPort, networkDestIp);
+        // copy shit in
+        memcpy(((char *) tcpHeader) + sizeof(tcphdr), data, length);
     }
 
     void send(char *data, size_t length) {
-        // assumes same ip as dest!
         sendPacket(hostSeq, hostAck, networkIp, networkDestinationIp, hostPort, 4000, true, false, false, false, data, length);
         hostSeq += length;
     }
@@ -239,15 +243,12 @@ inline bool operator<(const Endpoint a, const Endpoint b) {
     //return a.hostPort < b.hostPort;
 }
 
-#include <map>
-
-
 struct Tcp {
     std::set<uint32_t> inSynAckState;
-    IP &ip;
+    IP *ip;
     int port;
 
-    Tcp(IP &ip, int port) :ip(ip), port(port) {
+    Tcp(IP *ip, int port) :ip(ip), port(port) {
         globalIP = ip;
     }
 
@@ -256,24 +257,17 @@ struct Tcp {
     void dispatch(IpHeader *ipHeader, TcpHeader *tcpHeader);
 
     void run() {
-
         while (true) {
-            int length;
-            IpHeader *ipHeader = ip.getNextIpPacket(length);
-
-            TcpHeader *tcpHeader = (TcpHeader *) ipHeader->getData();
-            if (tcpHeader->getDestinationPort() == port) {
-
-                // this should never happen
-                if (length != ipHeader->getTotalLength()) {
-                    std::cout << "ERROR: Ip length does not match!" << std::endl;
-                    exit(-1);
+            int messages = ip->fetchPackageBatch();
+            for (int i = 0; i < messages; i++) {
+                IpHeader *ipHeader = ip->getIpPacket(i);
+                TcpHeader *tcpHeader = (TcpHeader *) ipHeader->getData();
+                if (tcpHeader->getDestinationPort() == port) {
+                    dispatch(ipHeader, tcpHeader);
                 }
-
-                dispatch(ipHeader, tcpHeader);
             }
+            ip->releasePackageBatch();
         }
-
     }
 
     std::function<void(Socket *)> onconnection;

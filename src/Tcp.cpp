@@ -1,5 +1,36 @@
 #include "Tcp.h"
 
+void IP::releasePackageBatch() {
+
+    mmsghdr sendVec[500] = {};
+    sockaddr_in sin[500];
+
+    for (int i = 0; i < queuedBuffersNum; i++) {
+
+        IpHeader *ipHeader = (IpHeader *) outBuffer[i];
+        TcpHeader *tcpHeader = (TcpHeader *) ipHeader->getData();
+
+        int length = ipHeader->getTotalLength();
+
+        sin[i].sin_family = AF_INET;
+        sin[i].sin_port = tcpHeader->dest;
+        sin[i].sin_addr.s_addr = ipHeader->daddr;
+
+        messages[i].iov_base = ipHeader;
+        messages[i].iov_len = length;
+
+        sendVec[i].msg_hdr.msg_iov = &messages[i];
+        sendVec[i].msg_hdr.msg_iovlen = 1;
+
+        sendVec[i].msg_hdr.msg_name = &sin[i];
+        sendVec[i].msg_hdr.msg_namelen = sizeof(sockaddr_in);
+
+    }
+
+    sendmmsg(fd, sendVec, queuedBuffersNum, 0);
+    queuedBuffersNum = 0;
+}
+
 void Tcp::dispatch(IpHeader *ipHeader, TcpHeader *tcpHeader) {
 
     // lookup can be improved
@@ -80,8 +111,7 @@ void Tcp::dispatch(IpHeader *ipHeader, TcpHeader *tcpHeader) {
         if (lastHostSeq == socket->hostSeq) {
             Socket::sendPacket(socket->hostSeq, socket->hostAck, ipHeader->saddr, ipHeader->daddr, ntohs(tcpHeader->source), ntohs(tcpHeader->dest), true, false, false, false, nullptr, 0);
         }
-
     }
 }
 
-IP globalIP;
+IP *globalIP;
