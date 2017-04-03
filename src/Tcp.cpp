@@ -3,7 +3,7 @@
 void IP::releasePackageBatch() {
 
     mmsghdr sendVec[500] = {};
-    sockaddr_in sin[500];
+    sockaddr_in sin[500] = {};
 
     for (int i = 0; i < queuedBuffersNum; i++) {
 

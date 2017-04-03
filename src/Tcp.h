@@ -197,7 +197,7 @@ inline bool operator<(const Endpoint a, const Endpoint b) {
 
     union hasher {
         Endpoint ep;
-        uint64_t i;
+        __int128 i;
     };
 
     hasher aH;
@@ -209,8 +209,6 @@ inline bool operator<(const Endpoint a, const Endpoint b) {
     bH.ep = b;
 
     return aH.i < bH.i;
-
-    //return a.hostPort < b.hostPort;
 }
 
 struct Tcp {
