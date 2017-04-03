@@ -25,123 +25,101 @@ extern IP *globalIP;
 
 struct Socket {
 
-//    static unsigned short csum(char *p,int nbytes)
-//    {
-//        unsigned short *ptr = (unsigned short *) p;
+    static unsigned short csum_continue(unsigned long sumStart, char *p,int nbytes)
+    {
+        unsigned short *ptr = (unsigned short *) p;
 
-//        register long sum;
-//        unsigned short oddbyte;
-//        register short answer;
+        register long sum;
+        unsigned short oddbyte;
+        register short answer;
 
-//        sum=0;
-//        while(nbytes>1) {
-//            sum+=*ptr++;
-//            nbytes-=2;
-//        }
-//        if(nbytes==1) {
-//            oddbyte=0;
-//            *((u_char*)&oddbyte)=*(u_char*)ptr;
-//            sum+=oddbyte;
-//        }
+        sum=sumStart;
+        while(nbytes>1) {
+            sum+=*ptr++;
+            nbytes-=2;
+        }
+        if(nbytes==1) {
+            oddbyte=0;
+            *((u_char*)&oddbyte)=*(u_char*)ptr;
+            sum+=oddbyte;
+        }
 
-//        sum = (sum>>16)+(sum & 0xffff);
-//        sum = sum + (sum>>16);
-//        answer=(short)~sum;
+        sum = (sum>>16)+(sum & 0xffff);
+        sum = sum + (sum>>16);
+        answer=(short)~sum;
 
-//        return(answer);
+        return(answer);
+    }
+
+//    static unsigned short csum(const char *buf, unsigned size) {
+//            unsigned long long sum = 0;
+//            const unsigned long long *b = (unsigned long long *) buf;
+
+//            unsigned t1, t2;
+//            unsigned short t3, t4;
+
+//            /* Main loop - 8 bytes at a time */
+//            while (size >= sizeof(unsigned long long))
+//            {
+//                    unsigned long long s = *b++;
+//                    sum += s;
+//                    if (sum < s) sum++;
+//                    size -= 8;
+//            }
+
+//            /* Handle tail less than 8-bytes long */
+//            buf = (const char *) b;
+//            if (size & 4)
+//            {
+//                    unsigned s = *(unsigned *)buf;
+//                    sum += s;
+//                    if (sum < s) sum++;
+//                    buf += 4;
+//            }
+
+//            if (size & 2)
+//            {
+//                    unsigned short s = *(unsigned short *) buf;
+//                    sum += s;
+//                    if (sum < s) sum++;
+//                    buf += 2;
+//            }
+
+//            if (size)
+//            {
+//                    unsigned char s = *(unsigned char *) buf;
+//                    sum += s;
+//                    if (sum < s) sum++;
+//            }
+
+//            /* Fold down to 16 bits */
+//            t1 = sum;
+//            t2 = sum >> 32;
+//            t1 += t2;
+//            if (t1 < t2) t1++;
+//            t3 = t1;
+//            t4 = t1 >> 16;
+//            t3 += t4;
+//            if (t3 < t4) t3++;
+
+//            return ~t3;
 //    }
 
-    static unsigned short csum(const char *buf, unsigned size) {
-            unsigned long long sum = 0;
-            const unsigned long long *b = (unsigned long long *) buf;
+    static unsigned long getPseudoHeaderSum(u_int32_t saddr, u_int32_t daddr, u_int16_t tcpLength) {
+        struct PseudoHeader {
+            u_int32_t source_address;
+            u_int32_t dest_address;
+            u_int8_t placeholder;
+            u_int8_t protocol;
+            u_int16_t tcp_length;
+        } volatile pseudoHeader = {saddr, daddr, 0, IPPROTO_TCP, tcpLength};
 
-            unsigned t1, t2;
-            unsigned short t3, t4;
-
-            /* Main loop - 8 bytes at a time */
-            while (size >= sizeof(unsigned long long))
-            {
-                    unsigned long long s = *b++;
-                    sum += s;
-                    if (sum < s) sum++;
-                    size -= 8;
-            }
-
-            /* Handle tail less than 8-bytes long */
-            buf = (const char *) b;
-            if (size & 4)
-            {
-                    unsigned s = *(unsigned *)buf;
-                    sum += s;
-                    if (sum < s) sum++;
-                    buf += 4;
-            }
-
-            if (size & 2)
-            {
-                    unsigned short s = *(unsigned short *) buf;
-                    sum += s;
-                    if (sum < s) sum++;
-                    buf += 2;
-            }
-
-            if (size)
-            {
-                    unsigned char s = *(unsigned char *) buf;
-                    sum += s;
-                    if (sum < s) sum++;
-            }
-
-            /* Fold down to 16 bits */
-            t1 = sum;
-            t2 = sum >> 32;
-            t1 += t2;
-            if (t1 < t2) t1++;
-            t3 = t1;
-            t4 = t1 >> 16;
-            t3 += t4;
-            if (t3 < t4) t3++;
-
-            return ~t3;
-    }
-
-    struct pseudo_header
-    {
-        u_int32_t source_address;
-        u_int32_t dest_address;
-        u_int8_t placeholder;
-        u_int8_t protocol;
-        u_int16_t tcp_length;
-    };
-
-    // no need for copies?
-    static unsigned short getChecksum(tcphdr *tcpHeader, pseudo_header *info, char *data = nullptr, size_t length = 0) {
-
-
-
-
-        char buf[sizeof(tcphdr) + sizeof(pseudo_header) + 1024];
-
-        memcpy(buf + sizeof(pseudo_header), tcpHeader, sizeof(tcphdr));
-
-        memcpy(buf, info, sizeof(pseudo_header));
-
-        memcpy(buf + sizeof(pseudo_header) + sizeof(tcphdr), data, length);
-
-        return csum(buf, sizeof(tcphdr) + sizeof(pseudo_header) + length);
-
-
-    }
-
-
-    static unsigned short getChecksum(iphdr *tcpHeader, pseudo_header *info, char *data = nullptr, size_t length = 0) {
-        char buf[sizeof(iphdr) + sizeof(pseudo_header) + 1024];
-        memcpy(buf + sizeof(pseudo_header), tcpHeader, sizeof(iphdr));
-        memcpy(buf, info, sizeof(pseudo_header));
-
-        memcpy(buf + sizeof(pseudo_header) + sizeof(pseudo_header), data, length);
-
-        return csum(buf, sizeof(iphdr) + sizeof(pseudo_header) + length);
+        unsigned short *ptr = (unsigned short *) &pseudoHeader;
+        unsigned long sum = 0;
+        for (int i = 0; i < 6; i++) {
+            sum += *ptr++;
+        }
+        return sum;
     }
 
     static void sendPacket(uint32_t hostSeq, uint32_t hostAck, uint32_t networkDestIp, uint32_t networkSourceIp, int hostDestPort,
@@ -158,7 +136,7 @@ struct Socket {
         ipHeader->protocol = IPPROTO_TCP;
         ipHeader->saddr = networkSourceIp;
         ipHeader->daddr = networkDestIp;
-        ipHeader->check = csum((char *) ipHeader, sizeof(iphdr));
+        //ipHeader->check = csum_continue(0, (char *) ipHeader, sizeof(iphdr));
 
         TcpHeader *tcpHeader = (TcpHeader *) ipHeader->getData();
         memset(tcpHeader, 0, sizeof(tcphdr));
@@ -169,6 +147,7 @@ struct Socket {
         tcpHeader->rst = flagRst;
         if (data) {
             tcpHeader->psh = true;
+            memcpy(((char *) tcpHeader) + sizeof(tcphdr), data, length);
         }
 
         tcpHeader->ack_seq = htonl(hostAck);
@@ -178,19 +157,10 @@ struct Socket {
 
         // todo
         tcpHeader->doff = 5; // 5 * 4 = 20 bytes
-        tcpHeader->window = htons(43690); // flow control
+        tcpHeader->window = htons(43690);
 
-        // properly calculate checksum for this header
-        pseudo_header info;
-        info.dest_address = networkDestIp;
-        info.source_address = networkSourceIp;
-        info.placeholder = 0;
-        info.protocol = IPPROTO_TCP;
-        info.tcp_length = htons(sizeof(tcphdr) + length);
-        tcpHeader->check = getChecksum(tcpHeader, &info, data, length);
-
-        // copy shit in
-        memcpy(((char *) tcpHeader) + sizeof(tcphdr), data, length);
+        tcpHeader->check = csum_continue(getPseudoHeaderSum(networkSourceIp, networkDestIp, htons(sizeof(tcphdr) + length))
+                                         , (char *) tcpHeader, sizeof(tcphdr) + length);
     }
 
     void send(char *data, size_t length) {

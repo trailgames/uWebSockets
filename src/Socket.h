@@ -85,11 +85,11 @@ struct Socket {
     }
 
     int setPoll(int events) {
-
+        return events;
     }
 
     int getFd() {
-
+        return 0;
     }
 
     void start(Loop *loop, Socket *self, int events) {
@@ -196,7 +196,7 @@ struct Socket {
     }
 
     int getPoll() {
-
+        return 0;
     }
 
     operator Poll *() const {
