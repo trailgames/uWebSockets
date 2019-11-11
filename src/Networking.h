@@ -39,7 +39,11 @@
 #define pthread_t DWORD
 #define pthread_self GetCurrentThreadId
 #endif
+#if UWS_NO_DLLEXPORT
+#define WIN32_EXPORT
+#else
 #define WIN32_EXPORT __declspec(dllexport)
+#endif
 
 inline void close(SOCKET fd) {closesocket(fd);}
 inline int setsockopt(SOCKET fd, int level, int optname, const void *optval, socklen_t optlen) {
